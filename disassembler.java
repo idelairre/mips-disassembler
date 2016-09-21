@@ -13,7 +13,7 @@ abstract class Procedure {
   }
 
   public static String getRegister(int reg) {
-    return new String('$' + Integer.toString(reg));
+    return '$' + Integer.toString(reg);
   }
 
   public int getAddress() {
@@ -129,7 +129,7 @@ class IFormat extends Procedure {
     short offset = (short) (hex & 0xFFFF);
     if (opcode.equals("beq") || opcode.equals("bne")) {
       int branch = getBranch(offset);
-      return new String(Integer.toHexString(branch));
+      return Integer.toHexString(branch);
     }
     return String.valueOf(offset);
   }
