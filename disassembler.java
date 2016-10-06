@@ -3,7 +3,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Collections;
-import java.math.BigInteger;
 
 abstract class Procedure {
   protected static int address = 0x7A05C;
@@ -87,7 +86,7 @@ class IFormat extends Procedure {
   // I-Format procedures are called [opcode], [rt], [rs], [offset], they are REPRESENTED as [opcode], [rs], [rt], [offset]
   private String opcode;
   private String rs;
-  private String rd;
+  private String rt;
   private String offset;
   private String branch;
 
@@ -106,12 +105,12 @@ class IFormat extends Procedure {
     super();
     opcode = setOpcode(hex);
     rs = setRs(hex);
-    rd = setRd(hex);
+    rt = setRt(hex);
     offset = setOffset(hex);
 
   }
 
-  private static String setRd(int hex) {
+  private static String setRt(int hex) {
     int reg = (hex & 0x1F0000) >>> 16;
     return getRegister(reg);
   }
@@ -143,9 +142,9 @@ class IFormat extends Procedure {
     String procedure;
     String currentAddress = Integer.toHexString(address);
     if (opcode.equals("beq") || opcode.equals("bne")) {
-      procedure = opcode + " " + rs + ", " + rd + ", address " + offset;
+      procedure = opcode + " " + rs + ", " + rt + ", address " + offset;
     } else {
-      procedure = opcode + " " + rd + ", " + offset + '(' + rs + ')';
+      procedure = opcode + " " + rt + ", " + offset + '(' + rs + ')';
     }
     return currentAddress + " " + procedure;
   }
@@ -157,14 +156,32 @@ class IFormat extends Procedure {
 }
 
 class Disassembler {
-  public static final int[] instructions = { 0x022DA822, 0x8EF30018, 0x12A70004, 0x02689820, 0xAD930018, 0x02697824, 0xAD8FFFF4,
-0x018C6020, 0x02A4A825, 0x158FFFF6, 0x8E59FFF0 };
-
-  public static final Map<Integer, String> tests;
+  public static final Map<Integer, String> instructions;
 
   static {
     Map<Integer, String> tempMap = new LinkedHashMap<Integer, String>(); // need a linked hash map so these iterate in order
     // R-Format
+    tempMap.put(0x022DA822, "7a060 sub $21, $17, $13");
+    tempMap.put(0x8EF30018, "7a064 lw $19, 24($23)");
+    tempMap.put(0x12A70004, "7a068 beq $21, $7, address 7a06c");
+    tempMap.put(0x02689820, "7a06c add $19, $19, $8");
+    tempMap.put(0xAD930018, "7a070 sw $19, 24($12)");
+    tempMap.put(0x02697824, "7a074 and $15, $19, $9");
+    tempMap.put(0xAD8FFFF4, "7a078 sw $15, -12($12)");
+    tempMap.put(0x018C6020, "7a07c add $12, $12, $12");
+    tempMap.put(0x02A4A825, "7a080 or $21, $21, $4");
+    tempMap.put(0x158FFFF6, "7a084 bne $12, $15, address 7a07a");
+    tempMap.put(0x8E59FFF0, "7a088 lw $25, -16($18)");
+    instructions = Collections.unmodifiableMap(tempMap);
+  }
+
+//   { 0x022DA822, 0x8EF30018, 0x12A70004, 0x02689820, 0xAD930018, 0x02697824, 0xAD8FFFF4,
+// 0x018C6020, 0x02A4A825, 0x158FFFF6, 0x8E59FFF0 };
+
+  public static final Map<Integer, String> tests;
+
+  static {
+    Map<Integer, String> tempMap = new LinkedHashMap<Integer, String>();
     tempMap.put(0x01398820, "7a060 add $17, $9, $25");
     tempMap.put(0x01398824, "7a064 and $17, $9, $25");
     tempMap.put(0x01398822, "7a068 sub $17, $9, $25");
@@ -197,7 +214,7 @@ class Disassembler {
     return passed;
   }
 
-  static void test() {
+  static void parseAddresses(Map<Integer, String> tests, Boolean test) {
     Iterator it = tests.entrySet().iterator();
     while(it.hasNext()) {
       Map.Entry entry = (Map.Entry) it.next();
@@ -208,25 +225,15 @@ class Disassembler {
       } else {
         procedure = new IFormat(key);
       }
-      assertEqual(procedure.toString(), (String) entry.getValue());
-    }
-  }
-
-  static void parseAddresses() {
-    for (int i = 0; i < instructions.length - 1; i++) {
-      int address = instructions[i];
-      if (isRFormat(address)) {
-        RFormat procedure = new RFormat(address);
-        procedure.print();
+      if (test) {
+        assertEqual(procedure.toString(), (String) entry.getValue());
       } else {
-        IFormat procedure = new IFormat(address);
-        procedure.print();
+        System.out.println(procedure.toString());
       }
     }
   }
 
   public static void main(String[] args) {
-    // parseAddresses();
-    test();
+    parseAddresses(instructions, false);
   }
 }
