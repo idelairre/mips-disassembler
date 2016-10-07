@@ -6,17 +6,29 @@ import java.util.Collections;
 
 abstract class Procedure {
   protected static int address = 0x7A05C;
+  protected String rs;
+  protected String rt;
 
   public Procedure() {
-    address = address + 4;
+    address += 4;
   }
 
-  public static String getRegister(int reg) {
+  protected static String getRegister(int reg) {
     return '$' + Integer.toString(reg);
   }
 
-  public int getAddress() {
+  protected int getAddress() {
     return address;
+  }
+
+  protected static String setRt(int hex) {
+    int reg = (hex & 0x1F0000) >>> 16;
+    return getRegister(reg);
+  }
+
+  protected static String setRs(int hex) {
+    int reg = (hex & 0x3E00000) >>> 21;
+    return getRegister(reg);
   }
 
   abstract public void print();
@@ -26,8 +38,6 @@ abstract class Procedure {
 }
 
 class RFormat extends Procedure {
-  private String rs;
-  private String rt;
   private String rd;
   private String funct;
 
@@ -49,16 +59,6 @@ class RFormat extends Procedure {
     rt = setRt(hex);
     rd = setRd(hex);
     funct = setFunct(hex);
-  }
-
-  private static String setRs(int hex) {
-    int reg = (hex & 0x3E00000) >>> 21;
-    return getRegister(reg);
-  }
-
-  private static String setRt(int hex) {
-    int reg = (hex & 0x1F0000) >>> 16;
-    return getRegister(reg);
   }
 
   private static String setRd(int hex) {
@@ -85,8 +85,6 @@ class RFormat extends Procedure {
 class IFormat extends Procedure {
   // I-Format procedures are called [opcode], [rt], [rs], [offset], they are REPRESENTED as [opcode], [rs], [rt], [offset]
   private String opcode;
-  private String rs;
-  private String rt;
   private String offset;
   private String branch;
 
@@ -107,21 +105,10 @@ class IFormat extends Procedure {
     rs = setRs(hex);
     rt = setRt(hex);
     offset = setOffset(hex);
-
   }
 
-  private static String setRt(int hex) {
-    int reg = (hex & 0x1F0000) >>> 16;
-    return getRegister(reg);
-  }
-
-  private static String setRs(int hex) {
-    int reg = (hex & 0x3E00000) >>> 21;
-    return getRegister(reg);
-  }
-
-  public int getBranch(short offset) {
-    return address + offset;
+  private int getBranch(short offset) {
+    return (address + 4) + (offset << 2); // sign extension evidently occurs automatically in java
   }
 
   private String setOffset(int hex) {
@@ -156,27 +143,24 @@ class IFormat extends Procedure {
 }
 
 class Disassembler {
-  public static final Map<Integer, String> instructions;
+  public static final Map<Integer, String> instructions;  // need a linked hash map so these iterate in order
 
   static {
-    Map<Integer, String> tempMap = new LinkedHashMap<Integer, String>(); // need a linked hash map so these iterate in order
+    Map<Integer, String> tempMap = new LinkedHashMap<Integer, String>(); // maybe there is a more idiomatic way of populating this?
     // R-Format
     tempMap.put(0x022DA822, "7a060 sub $21, $17, $13");
     tempMap.put(0x8EF30018, "7a064 lw $19, 24($23)");
-    tempMap.put(0x12A70004, "7a068 beq $21, $7, address 7a06c");
+    tempMap.put(0x12A70004, "7a068 beq $21, $7, address 7a078");
     tempMap.put(0x02689820, "7a06c add $19, $19, $8");
     tempMap.put(0xAD930018, "7a070 sw $19, 24($12)");
     tempMap.put(0x02697824, "7a074 and $15, $19, $9");
     tempMap.put(0xAD8FFFF4, "7a078 sw $15, -12($12)");
     tempMap.put(0x018C6020, "7a07c add $12, $12, $12");
     tempMap.put(0x02A4A825, "7a080 or $21, $21, $4");
-    tempMap.put(0x158FFFF6, "7a084 bne $12, $15, address 7a07a");
+    tempMap.put(0x158FFFF6, "7a084 bne $12, $15, address 7a05c");
     tempMap.put(0x8E59FFF0, "7a088 lw $25, -16($18)");
     instructions = Collections.unmodifiableMap(tempMap);
   }
-
-//   { 0x022DA822, 0x8EF30018, 0x12A70004, 0x02689820, 0xAD930018, 0x02697824, 0xAD8FFFF4,
-// 0x018C6020, 0x02A4A825, 0x158FFFF6, 0x8E59FFF0 };
 
   public static final Map<Integer, String> tests;
 
@@ -192,10 +176,10 @@ class Disassembler {
     tempMap.put(0x8d31fb2e, "7a078 lw $17, -1234($9)");
     tempMap.put(0xad3104d2, "7a07c sw $17, 1234($9)");
     tempMap.put(0xad31fb2e, "7a080 sw $17, -1234($9)");
-    tempMap.put(0x1229ffff, "7a084 beq $17, $9, address 7a083"); // -1
-    tempMap.put(0x1229000e, "7a088 beq $17, $9, address 7a096"); // 14
-    tempMap.put(0x1629fff1, "7a08c bne $17, $9, address 7a07d"); // -15
-    tempMap.put(0x16290000, "7a090 bne $17, $9, address 7a090"); // 0
+    tempMap.put(0x1229ffff, "7a084 beq $17, $9, address 7a084"); // -1
+    tempMap.put(0x1229000e, "7a088 beq $17, $9, address 7a0c4"); // 14
+    tempMap.put(0x1629fff1, "7a08c bne $17, $9, address 7a054"); // -15
+    tempMap.put(0x16290000, "7a090 bne $17, $9, address 7a094"); // 0
     tempMap.put(0xAE77FFFC, "7a094 sw $23, -4($19)");
     tests = Collections.unmodifiableMap(tempMap);
   }
@@ -215,10 +199,8 @@ class Disassembler {
   }
 
   static void parseAddresses(Map<Integer, String> tests, Boolean test) {
-    Iterator it = tests.entrySet().iterator();
-    while(it.hasNext()) {
-      Map.Entry entry = (Map.Entry) it.next();
-      int key = Integer.valueOf((int) entry.getKey());
+    for (Map.Entry<Integer, String> entry : tests.entrySet()) {
+      int key = entry.getKey();
       Procedure procedure;
       if (isRFormat(key)) {
         procedure = new RFormat(key);
@@ -226,7 +208,7 @@ class Disassembler {
         procedure = new IFormat(key);
       }
       if (test) {
-        assertEqual(procedure.toString(), (String) entry.getValue());
+        assertEqual(procedure.toString(), entry.getValue());
       } else {
         System.out.println(procedure.toString());
       }
